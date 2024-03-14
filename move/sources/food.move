@@ -7,6 +7,8 @@ module aptogotchi::food {
     use std::option;
     use std::signer::address_of;
     use std::string::Self;
+    // declare main module as a friend so only it can call mint_food and burn_food, but not other modules
+    friend aptogotchi::main;
 
     const APP_OBJECT_SEED: vector<u8> = b"APTOGOTCHI_FOOD";
     /// The food collection name
@@ -21,9 +23,14 @@ module aptogotchi::food {
     const FOOD_SYMBOL: vector<u8> = b"FOOD";
     const PROJECT_URI: vector<u8> = b"https://www.aptoslabs.com";
 
-    // Tokens require a signer to create, so this is the signer for the collection
-    struct AppCapability has key {
-        extend_ref: ExtendRef,
+    // We need a contract signer as the creator of the food collection and food token
+    // Otherwise we need admin to sign whenever a new food token is minted which is inconvenient
+    struct Config has key {
+        // This is the extend_ref of the app object, not the extend_ref of food collection object or food token object
+        // config object is the creator and owner of food collection object
+        // config object is also the creator of all food token (ERC-1155 like semi fungible token) objects
+        // but owner of each food token object is aptogotchi owner
+        app_extend_ref: ExtendRef,
     }
 
     struct FoodToken has key {
@@ -38,8 +45,8 @@ module aptogotchi::food {
         let extend_ref = object::generate_extend_ref(constructor_ref);
         let app_signer = &object::generate_signer(constructor_ref);
 
-        move_to(app_signer, AppCapability {
-            extend_ref,
+        move_to(app_signer, Config {
+            app_extend_ref: extend_ref,
         });
 
         create_food_collection(app_signer);
@@ -50,8 +57,8 @@ module aptogotchi::food {
         object::create_object_address(&@aptogotchi, APP_OBJECT_SEED)
     }
 
-    fun get_app_signer(app_signer_address: address): signer acquires AppCapability {
-        object::generate_signer_for_extending(&borrow_global<AppCapability>(app_signer_address).extend_ref)
+    fun get_app_signer(app_signer_address: address): signer acquires Config {
+        object::generate_signer_for_extending(&borrow_global<Config>(app_signer_address).app_extend_ref)
     }
 
     /// Creates the food collection.
@@ -97,6 +104,20 @@ module aptogotchi::food {
         });
     }
 
+    public(friend) fun mint_food(user: &signer, amount: u64) acquires FoodToken {
+        let food_token = borrow_global<FoodToken>(get_food_token_address());
+        let fungible_asset_mint_ref = &food_token.fungible_asset_mint_ref;
+        primary_fungible_store::deposit(
+            address_of(user),
+            fungible_asset::mint(fungible_asset_mint_ref, amount),
+        );
+    }
+
+    public(friend) fun burn_food(user: &signer, amount: u64) acquires FoodToken {
+        let food_token = borrow_global<FoodToken>(get_food_token_address());
+        primary_fungible_store::burn(&food_token.fungible_asset_burn_ref, address_of(user), amount);
+    }
+
     #[view]
     public fun get_food_token_address(): address {
         token::create_token_address(
@@ -119,22 +140,6 @@ module aptogotchi::food {
     public fun get_food_balance(owner_addr: address): u64 {
         let food_token = object::address_to_object<FoodToken>(get_food_token_address());
         primary_fungible_store::balance(owner_addr, food_token)
-    }
-
-    // Warning: There is a vulnerability here where an attacker can directly invoke mint_food and mint any amount of token.
-    // To fix this issue, we advise modifying both the `burn_food` and `mint_food` functions to `public(friend)`, as well as adding `aptogotchi.move` as a `friend` module. 
-    public fun mint_food(user: &signer, amount: u64) acquires FoodToken {
-        let food_token = borrow_global<FoodToken>(get_food_token_address());
-        let fungible_asset_mint_ref = &food_token.fungible_asset_mint_ref;
-        primary_fungible_store::deposit(
-            address_of(user),
-            fungible_asset::mint(fungible_asset_mint_ref, amount),
-        );
-    }
-
-    public fun burn_food(user: &signer, amount: u64) acquires FoodToken {
-        let food_token = borrow_global<FoodToken>(get_food_token_address());
-        primary_fungible_store::burn(&food_token.fungible_asset_burn_ref, address_of(user), amount);
     }
 
     #[test_only]
