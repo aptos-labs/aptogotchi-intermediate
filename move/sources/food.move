@@ -25,10 +25,10 @@ module aptogotchi::food {
 
     // We need a contract signer as the creator of the food collection and food token
     // Otherwise we need admin to sign whenever a new food token is minted which is inconvenient
-    struct Config has key {
+    struct ObjectController has key {
         // This is the extend_ref of the app object, not the extend_ref of food collection object or food token object
-        // config object is the creator and owner of food collection object
-        // config object is also the creator of all food token (ERC-1155 like semi fungible token) objects
+        // app object is the creator and owner of food collection object
+        // app object is also the creator of all food token (ERC-1155 like semi fungible token) objects
         // but owner of each food token object is aptogotchi owner
         app_extend_ref: ExtendRef,
     }
@@ -45,7 +45,7 @@ module aptogotchi::food {
         let extend_ref = object::generate_extend_ref(constructor_ref);
         let app_signer = &object::generate_signer(constructor_ref);
 
-        move_to(app_signer, Config {
+        move_to(app_signer, ObjectController {
             app_extend_ref: extend_ref,
         });
 
@@ -57,8 +57,8 @@ module aptogotchi::food {
         object::create_object_address(&@aptogotchi, APP_OBJECT_SEED)
     }
 
-    fun get_app_signer(app_signer_address: address): signer acquires Config {
-        object::generate_signer_for_extending(&borrow_global<Config>(app_signer_address).app_extend_ref)
+    fun get_app_signer(app_signer_address: address): signer acquires ObjectController {
+        object::generate_signer_for_extending(&borrow_global<ObjectController>(app_signer_address).app_extend_ref)
     }
 
     /// Creates the food collection.

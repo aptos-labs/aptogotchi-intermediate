@@ -51,10 +51,10 @@ module aptogotchi::main {
 
     // We need a contract signer as the creator of the aptogotchi collection and aptogotchi token
     // Otherwise we need admin to sign whenever a new aptogotchi token is minted which is inconvenient
-    struct Config has key {
+    struct ObjectController has key {
         // This is the extend_ref of the app object, not the extend_ref of collection object or token object
-        // config object is the creator and owner of aptogotchi collection object
-        // config object is also the creator of all aptogotchi token (NFT) objects
+        // app object is the creator and owner of aptogotchi collection object
+        // app object is also the creator of all aptogotchi token (NFT) objects
         // but owner of each token object is aptogotchi owner (i.e. user who mints aptogotchi)
         app_extend_ref: ExtendRef,
     }
@@ -76,7 +76,7 @@ module aptogotchi::main {
         let extend_ref = object::generate_extend_ref(constructor_ref);
         let app_signer = &object::generate_signer(constructor_ref);
 
-        move_to(app_signer, Config {
+        move_to(app_signer, ObjectController {
             app_extend_ref: extend_ref,
         });
 
@@ -88,8 +88,8 @@ module aptogotchi::main {
         object::create_object_address(&@aptogotchi, APP_OBJECT_SEED)
     }
 
-    fun get_app_signer(app_signer_address: address): signer acquires Config {
-        object::generate_signer_for_extending(&borrow_global<Config>(app_signer_address).app_extend_ref)
+    fun get_app_signer(app_signer_address: address): signer acquires ObjectController {
+        object::generate_signer_for_extending(&borrow_global<ObjectController>(app_signer_address).app_extend_ref)
     }
 
     // Create the collection that will hold all the Aptogotchis
@@ -123,7 +123,7 @@ module aptogotchi::main {
     }
 
     // Create an Aptogotchi token object
-    public entry fun create_aptogotchi(user: &signer, name: String, parts: vector<u8>) acquires Config {
+    public entry fun create_aptogotchi(user: &signer, name: String, parts: vector<u8>) acquires ObjectController {
         assert!(vector::length(&parts) == PARTS_SIZE, error::invalid_argument(EPARTS_LIMIT));
         assert!(string::length(&name) <= NAME_UPPER_BOUND, error::invalid_argument(ENAME_LIMIT));
         let uri = string::utf8(APTOGOTCHI_COLLECTION_URI);
@@ -252,7 +252,7 @@ module aptogotchi::main {
 
     // ==== ACCESSORIES ====
     // Create an Aptogotchi token object
-    public entry fun create_accessory(user: &signer, category: String) acquires Config {
+    public entry fun create_accessory(user: &signer, category: String) acquires ObjectController {
         let uri = string::utf8(ACCESSORY_COLLECTION_URI);
         let description = string::utf8(ACCESSORY_COLLECTION_DESCRIPTION);
 
@@ -279,7 +279,7 @@ module aptogotchi::main {
         object::transfer_with_ref(object::generate_linear_transfer_ref(&transfer_ref), address_of(user));
     }
 
-    public entry fun wear_accessory(owner: &signer, category: String) acquires Config {
+    public entry fun wear_accessory(owner: &signer, category: String) acquires ObjectController {
         let owner_addr = &address_of(owner);
         // retrieve the aptogotchi object
         let token_address = get_aptogotchi_address(owner_addr);
@@ -293,7 +293,7 @@ module aptogotchi::main {
     }
 
     #[view]
-    public fun has_accessory(owner: &signer, category: String): bool acquires Config {
+    public fun has_accessory(owner: &signer, category: String): bool acquires ObjectController {
         let owner_addr = &address_of(owner);
         // retrieve the accessory object by category
         let accessory_address = get_accessory_address(owner_addr, category);
@@ -301,7 +301,7 @@ module aptogotchi::main {
         exists<Accessory>(accessory_address)
     }
 
-    public entry fun unwear_accessory(owner: &signer, category: String) acquires Config {
+    public entry fun unwear_accessory(owner: &signer, category: String) acquires ObjectController {
         let owner_addr = &address_of(owner);
 
         // retrieve the accessory object by category
@@ -329,7 +329,7 @@ module aptogotchi::main {
         token_name
     }
 
-    fun get_accessory_address(creator_addr: &address, category: String): (address) acquires Config {
+    fun get_accessory_address(creator_addr: &address, category: String): (address) acquires ObjectController {
         let collection = string::utf8(ACCESSORY_COLLECTION_NAME);
         let token_name = category;
         string::append(&mut token_name, to_string(creator_addr));
@@ -375,7 +375,7 @@ module aptogotchi::main {
 
     // Test creating an Aptogotchi
     #[test(aptos = @0x1, account = @aptogotchi, creator = @0x123)]
-    fun test_create_aptogotchi(aptos: &signer, account: &signer, creator: &signer) acquires Config {
+    fun test_create_aptogotchi(aptos: &signer, account: &signer, creator: &signer) acquires ObjectController {
         setup_test(aptos, account, creator);
 
         create_aptogotchi(creator, string::utf8(b"test"), vector[1, 1, 1]);
@@ -399,7 +399,7 @@ module aptogotchi::main {
     }
 
     #[test(aptos = @0x1, account = @aptogotchi, creator = @0x123)]
-    fun test_feed_and_play(aptos: &signer, account: &signer, creator: &signer) acquires Config, Aptogotchi {
+    fun test_feed_and_play(aptos: &signer, account: &signer, creator: &signer) acquires ObjectController, Aptogotchi {
         setup_test(aptos, account, creator);
         food::init_module_for_test(account);
 
@@ -423,7 +423,7 @@ module aptogotchi::main {
 
     #[test(aptos = @0x1, account = @aptogotchi, creator = @0x123)]
     #[expected_failure(abort_code = 393218, location = 0x1::object)]
-    fun test_feed_with_no_food(aptos: &signer, account: &signer, creator: &signer) acquires Config, Aptogotchi {
+    fun test_feed_with_no_food(aptos: &signer, account: &signer, creator: &signer) acquires ObjectController, Aptogotchi {
         setup_test(aptos, account, creator);
         food::init_module_for_test(account);
 
@@ -438,7 +438,7 @@ module aptogotchi::main {
     }
 
     #[test(aptos = @0x1, account = @aptogotchi, creator = @0x123)]
-    fun test_create_accessory(aptos: &signer, account: &signer, creator: &signer) acquires Config, Accessory {
+    fun test_create_accessory(aptos: &signer, account: &signer, creator: &signer) acquires ObjectController, Accessory {
         setup_test(aptos, account, creator);
         let creator_address = &address_of(creator);
 
@@ -452,7 +452,7 @@ module aptogotchi::main {
     }
 
     #[test(aptos = @0x1, account = @aptogotchi, creator = @0x123)]
-    fun test_wear_accessory(aptos: &signer, account: &signer, creator: &signer) acquires Config {
+    fun test_wear_accessory(aptos: &signer, account: &signer, creator: &signer) acquires ObjectController {
         setup_test(aptos, account, creator);
         let creator_address = &address_of(creator);
 
@@ -478,7 +478,7 @@ module aptogotchi::main {
         aptos: &signer,
         account: &signer,
         creator: &signer
-    ) acquires Config {
+    ) acquires ObjectController {
         setup_test(aptos, account, creator);
 
         create_aptogotchi(creator, string::utf8(b"test"), vector[1, 1, 1]);
