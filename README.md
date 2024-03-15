@@ -8,7 +8,7 @@ While it shares most of the code base from the beginner Demo, we added a few mor
 
 to showcase more advanced concepts of the Move smart contract language.
 
-This dApp will be used as an educational demo hosted on [Builder Hub](https://github.com/aptos-labs/aptos-builder-hub).
+This dApp will be used as an educational demo hosted on [Aptos Learn](https://learn.aptoslabs.com/).
 
 ---
 
