@@ -8,22 +8,26 @@ import { Pet } from "./Pet";
 import { Food } from "./Food";
 import { Modal } from "@/components/Modal";
 import { getAptosClient } from "@/utils/aptosClient";
+import { APTOGOTCHI_CONTRACT_ADDRESS } from "@/utils/const";
+import { MoveValue } from "@aptos-labs/ts-sdk";
 
 const TESTNET_ID = "2";
 
 const aptosClient = getAptosClient();
 
 export function Connected() {
+  const [hasPet, SetHasPet] = useState(false);
   const [pet, setPet] = useState<Pet>();
   const [food, setFood] = useState<Food>();
   const { account, network } = useWallet();
 
   const fetchPet = useCallback(async () => {
     if (!account?.address) return;
+    if (!hasPet) return;
 
     const response = await aptosClient.view({
       payload: {
-        function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::main::get_aptogotchi`,
+        function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::get_aptogotchi`,
         functionArguments: [account.address],
       },
     });
@@ -37,14 +41,15 @@ export function Connected() {
         accessories: response[4] as unknown as string,
       });
     }
-  }, [account?.address]);
+  }, [account?.address, hasPet]);
 
   const fetchFood = useCallback(async () => {
     if (!account?.address) return;
+    if (!hasPet) return;
 
     const response = await aptosClient.view({
       payload: {
-        function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::food::get_food_balance`,
+        function: `${APTOGOTCHI_CONTRACT_ADDRESS}::food::get_food_balance`,
         functionArguments: [account.address],
       },
     });
@@ -55,14 +60,29 @@ export function Connected() {
         number: parseInt(response[0] as unknown as string),
       });
     }
-  }, [account?.address]);
+  }, [account?.address, hasPet]);
 
   useEffect(() => {
-    if (!account?.address || !network) return;
+    if (!account?.address) return;
+
+    aptosClient
+      .view({
+        payload: {
+          function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::has_aptogotchi`,
+          functionArguments: [account.address],
+        },
+      })
+      .then((response: MoveValue[]) => {
+        SetHasPet(response[0] as boolean);
+      });
+  }, [account?.address, network]);
+
+  useEffect(() => {
+    if (!account?.address || !network || !hasPet) return;
 
     fetchPet();
     fetchFood();
-  }, [account?.address, fetchPet, fetchFood, network]);
+  }, [account?.address, fetchPet, fetchFood, hasPet, network]);
 
   return (
     <div className="flex flex-col gap-3 p-3">

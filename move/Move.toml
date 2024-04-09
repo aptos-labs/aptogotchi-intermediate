@@ -4,10 +4,10 @@ version = '1.0.0'
 upgrade_policy = "compatible"
 
 [addresses]
-aptogotchi = '_'
+aptogotchi_addr = '_'
 
 [dev-addresses]
-aptogotchi = '0x12345'
+aptogotchi_addr = '0x12345'
 
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
