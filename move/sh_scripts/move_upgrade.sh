@@ -2,7 +2,7 @@
 
 set -e
 
-echo "##### Deploy module under a new object #####"
+echo "##### Upgrade module #####"
 
 # Profile is the account you used to execute transaction
 # Run "aptos init" to create the profile, then get the profile name from .aptos/config.yaml
