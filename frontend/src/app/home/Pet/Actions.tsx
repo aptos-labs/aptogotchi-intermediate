@@ -5,25 +5,34 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Pet } from ".";
 import { getAptosClient } from "@/utils/aptosClient";
 import {
-  NEXT_PUBLIC_CONTRACT_ADDRESS,
   NEXT_PUBLIC_ENERGY_CAP,
   NEXT_PUBLIC_FOOD_INCREASE,
   NEXT_PUBLIC_ENERGY_DECREASE,
   NEXT_PUBLIC_ENERGY_INCREASE,
 } from "@/utils/env";
 import { Food } from "../Food";
+import { APTOGOTCHI_CONTRACT_ADDRESS } from "@/utils/const";
 
 const aptosClient = getAptosClient();
 
-export type Action = "feed" | "play" | "buy_accessory" | "buy_food" | "wear" | "unwear";
+export type Action =
+  | "feed"
+  | "play"
+  | "buy_accessory"
+  | "buy_food"
+  | "wear"
+  | "unwear"
+  | "upgrade_with_battle_ext";
 
 export interface ActionsProps {
   pet: Pet;
   food: Food;
   selectedAction: Action;
+  hasBattleExt: boolean;
   setSelectedAction: (action: Action) => void;
   setPet: Dispatch<SetStateAction<Pet | undefined>>;
   setFood: Dispatch<SetStateAction<Food | undefined>>;
+  setHasBattleExt: Dispatch<SetStateAction<boolean>>;
 }
 
 export function Actions({
@@ -31,6 +40,8 @@ export function Actions({
   setSelectedAction,
   setPet,
   setFood,
+  setHasBattleExt,
+  hasBattleExt,
   pet,
   food,
 }: ActionsProps) {
@@ -57,6 +68,9 @@ export function Actions({
       case "unwear":
         handleUnwear();
         break;
+      case "upgrade_with_battle_ext":
+        handleUpgradeWithBattleExt();
+        break;
     }
   };
 
@@ -66,7 +80,7 @@ export function Actions({
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${NEXT_PUBLIC_CONTRACT_ADDRESS}::main::feed`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::feed`,
       type_arguments: [],
       arguments: [NEXT_PUBLIC_ENERGY_INCREASE],
     };
@@ -109,7 +123,7 @@ export function Actions({
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${NEXT_PUBLIC_CONTRACT_ADDRESS}::main::play`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::play`,
       type_arguments: [],
       arguments: [NEXT_PUBLIC_ENERGY_DECREASE],
     };
@@ -142,7 +156,7 @@ export function Actions({
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::main::buy_food`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::buy_food`,
       type_arguments: [],
       arguments: [NEXT_PUBLIC_FOOD_INCREASE],
     };
@@ -173,7 +187,7 @@ export function Actions({
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::main::create_accessory`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::create_accessory`,
       type_arguments: [],
       arguments: ["bowtie"],
     };
@@ -196,7 +210,7 @@ export function Actions({
 
     const payload = {
       type: "entry_function_payload",
-      function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::main::wear_accessory`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::wear_accessory`,
       type_arguments: [],
       arguments: ["bowtie"],
     };
@@ -226,7 +240,7 @@ export function Actions({
 
     const payload = {
       type: "entry_function_payload",
-      function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::main::unwear_accessory`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::unwear_accessory`,
       type_arguments: [],
       arguments: ["bowtie"],
     };
@@ -249,11 +263,37 @@ export function Actions({
     }
   };
 
+  const handleUpgradeWithBattleExt = async () => {
+    if (!account || !network) return;
+
+    setTransactionInProgress(true);
+
+    const payload = {
+      type: "entry_function_payload",
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::upgrade_aptogotchi_with_battle_extension`,
+      type_arguments: [],
+      arguments: [],
+    };
+
+    try {
+      const response = await signAndSubmitTransaction(payload);
+      await aptosClient.waitForTransaction(response.hash);
+      setHasBattleExt(true);
+    } catch (error: any) {
+      console.error(error);
+    } finally {
+      setTransactionInProgress(false);
+    }
+  };
+
   const feedDisabled =
     selectedAction === "feed" && pet.energy_points === Number(NEXT_PUBLIC_ENERGY_CAP);
   const playDisabled = selectedAction === "play" && pet.energy_points === Number(0);
   const wearDisabled = Boolean(selectedAction === "wear" && pet.accessories);
   const unwearDisabled = Boolean(selectedAction === "unwear" && pet.accessories == null);
+  const upgradeWithBattleExtDisabled = Boolean(
+    selectedAction === "upgrade_with_battle_ext" && hasBattleExt
+  );
 
   return (
     <div className="nes-container with-title flex-1 bg-white h-[320px]">
@@ -320,13 +360,29 @@ export function Actions({
             />
             <span>Unwear</span>
           </label>
+          <label>
+            <input
+              type="radio"
+              className="nes-radio"
+              name="action"
+              checked={selectedAction === "upgrade_with_battle_ext"}
+              onChange={() => setSelectedAction("upgrade_with_battle_ext")}
+            />
+            <span>Upgrade with battle extension</span>
+          </label>
         </div>
         <div className="flex flex-col gap-4 justify-between">
           <p>{actionDescriptions[selectedAction]}</p>
           <button
             type="button"
             className={`nes-btn is-success ${
-              feedDisabled || playDisabled || wearDisabled || unwearDisabled ? "is-disabled" : ""
+              feedDisabled ||
+              playDisabled ||
+              wearDisabled ||
+              unwearDisabled ||
+              upgradeWithBattleExtDisabled
+                ? "is-disabled"
+                : ""
             }`}
             onClick={handleStart}
             disabled={
@@ -334,7 +390,8 @@ export function Actions({
               feedDisabled ||
               playDisabled ||
               wearDisabled ||
-              unwearDisabled
+              unwearDisabled ||
+              upgradeWithBattleExtDisabled
             }
           >
             {transactionInProgress ? "Processing..." : "Start"}
@@ -352,4 +409,5 @@ const actionDescriptions: Record<Action, string> = {
   buy_accessory: "Buying an accessory for your pet...",
   wear: "Wear an accessory for your pet...",
   unwear: "Take off an accessory for your pet...",
+  upgrade_with_battle_ext: "Upgrade your pet with a Battle Extension...",
 };

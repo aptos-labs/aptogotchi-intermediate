@@ -1,14 +1,12 @@
-module aptogotchi::food {
+module aptogotchi_addr::food {
     use aptos_framework::fungible_asset::{Self, MintRef, BurnRef};
     use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
-    use aptos_token_objects::collection;
-    use aptos_token_objects::token;
     use std::option;
     use std::signer::address_of;
     use std::string::Self;
     // declare main module as a friend so only it can call mint_food and burn_food, but not other modules
-    friend aptogotchi::main;
+    friend aptogotchi_addr::main;
 
     const APP_OBJECT_SEED: vector<u8> = b"APTOGOTCHI_FOOD";
     /// The food collection name
@@ -33,7 +31,7 @@ module aptogotchi::food {
         app_extend_ref: ExtendRef,
     }
 
-    struct FoodToken has key {
+    struct FoodController has key {
         /// Used to mint fungible assets.
         fungible_asset_mint_ref: MintRef,
         /// Used to burn fungible assets.
@@ -49,40 +47,6 @@ module aptogotchi::food {
             app_extend_ref: extend_ref,
         });
 
-        create_food_collection(app_signer);
-        create_food_token(app_signer);
-    }
-
-    fun get_app_signer_address(): address {
-        object::create_object_address(&@aptogotchi, APP_OBJECT_SEED)
-    }
-
-    fun get_app_signer(app_signer_address: address): signer acquires ObjectController {
-        object::generate_signer_for_extending(&borrow_global<ObjectController>(app_signer_address).app_extend_ref)
-    }
-
-    /// Creates the food collection.
-    fun create_food_collection(creator: &signer) {
-        collection::create_unlimited_collection(
-            creator,
-            string::utf8(FOOD_COLLECTION_DESCRIPTION),
-            string::utf8(FOOD_COLLECTION_NAME),
-            option::none(),
-            string::utf8(FOOD_COLLECTION_URI),
-        );
-    }
-
-    /// Creates the food token as fungible token.
-    fun create_food_token(creator: &signer) {
-        let constructor_ref = &token::create_named_token(
-            creator,
-            string::utf8(FOOD_COLLECTION_NAME),
-            string::utf8(FOOD_DESCRIPTION),
-            string::utf8(FOOD_NAME),
-            option::none(),
-            string::utf8(FOOD_URI),
-        );
-
         // Creates the fungible asset.
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
@@ -96,40 +60,38 @@ module aptogotchi::food {
         let fungible_asset_mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
         let fungible_asset_burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
 
-        let food_token_signer = &object::generate_signer(constructor_ref);
-        // Publishes the FoodToken resource with the refs.
-        move_to(food_token_signer, FoodToken {
+        // Publishes the FoodController resource with the refs.
+        move_to(app_signer, FoodController {
             fungible_asset_mint_ref,
             fungible_asset_burn_ref,
         });
     }
 
-    public(friend) fun mint_food(user: &signer, amount: u64) acquires FoodToken {
-        let food_token = borrow_global<FoodToken>(get_food_token_address());
-        let fungible_asset_mint_ref = &food_token.fungible_asset_mint_ref;
+    fun get_app_signer_address(): address {
+        object::create_object_address(&@aptogotchi_addr, APP_OBJECT_SEED)
+    }
+
+    fun get_app_signer(app_signer_address: address): signer acquires ObjectController {
+        object::generate_signer_for_extending(&borrow_global<ObjectController>(app_signer_address).app_extend_ref)
+    }
+
+    public(friend) fun mint_food(user: &signer, amount: u64) acquires FoodController {
+        let food_controller = borrow_global<FoodController>(get_app_signer_address());
+        let fungible_asset_mint_ref = &food_controller.fungible_asset_mint_ref;
         primary_fungible_store::deposit(
             address_of(user),
             fungible_asset::mint(fungible_asset_mint_ref, amount),
         );
     }
 
-    public(friend) fun burn_food(user: &signer, amount: u64) acquires FoodToken {
-        let food_token = borrow_global<FoodToken>(get_food_token_address());
-        primary_fungible_store::burn(&food_token.fungible_asset_burn_ref, address_of(user), amount);
-    }
-
-    #[view]
-    public fun get_food_token_address(): address {
-        token::create_token_address(
-            &get_app_signer_address(),
-            &string::utf8(FOOD_COLLECTION_NAME),
-            &string::utf8(FOOD_NAME),
-        )
+    public(friend) fun burn_food(user: &signer, amount: u64) acquires FoodController {
+        let food_controller = borrow_global<FoodController>(get_app_signer_address());
+        primary_fungible_store::burn(&food_controller.fungible_asset_burn_ref, address_of(user), amount);
     }
 
     #[view]
     /// Returns the balance of the food token of the owner
-    public fun food_balance(owner_addr: address, food: Object<FoodToken>): u64 {
+    public fun food_balance(owner_addr: address, food: Object<FoodController>): u64 {
         // should remove this function when re-publish the contract to the final address
         // this function is replaced by get_food_balance
         primary_fungible_store::balance(owner_addr, food)
@@ -138,8 +100,8 @@ module aptogotchi::food {
     #[view]
     /// Returns the balance of the food token of the owner
     public fun get_food_balance(owner_addr: address): u64 {
-        let food_token = object::address_to_object<FoodToken>(get_food_token_address());
-        primary_fungible_store::balance(owner_addr, food_token)
+        let food_controller = object::address_to_object<FoodController>(get_app_signer_address());
+        primary_fungible_store::balance(owner_addr, food_controller)
     }
 
     #[test_only]
@@ -150,8 +112,8 @@ module aptogotchi::food {
         init_module(creator);
     }
 
-    #[test(account = @aptogotchi, creator = @0x123)]
-    fun test_food(account: &signer, creator: &signer) acquires FoodToken {
+    #[test(account = @aptogotchi_addr, creator = @0x123)]
+    fun test_food(account: &signer, creator: &signer) acquires FoodController {
         init_module(account);
         create_account_for_test(address_of(creator));
 

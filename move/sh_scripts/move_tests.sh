@@ -2,7 +2,7 @@
 
 set -e
 
-echo "##### Running tests #####"
+echo "##### Running unit tests #####"
 
 aptos move test \
   --package-dir move \

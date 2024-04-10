@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { ShufflePetImage } from "../Pet/ShufflePetImage";
-import { NEXT_PUBLIC_CONTRACT_ADDRESS } from "@/utils/env";
+import { ShufflePetImage } from "@/app/home/Pet/ShufflePetImage";
+import { APTOGOTCHI_CONTRACT_ADDRESS } from "@/utils/const";
 import { getAptosClient } from "@/utils/aptosClient";
 
 const aptosClient = getAptosClient();
@@ -24,7 +24,7 @@ export function Mint({ fetchPet }: MintProps) {
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${NEXT_PUBLIC_CONTRACT_ADDRESS}::main::create_aptogotchi`,
+      function: `${APTOGOTCHI_CONTRACT_ADDRESS}::main::create_aptogotchi`,
       type_arguments: [],
       arguments: [newName, petParts],
     };
